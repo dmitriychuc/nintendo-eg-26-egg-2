@@ -12,7 +12,7 @@ FPS_BASE = 60
 # Цвета
 BACKGROUND_COLOR = (25, 25, 35)
 LINE_COLOR = (70, 100, 150)
-EGG_COLOR = (245, 240, 200)
+EGG_COLOR = (255, 250, 220)
 EGG_SHINE = (255, 250, 220)
 WOLF_COLOR = (210, 210, 230)
 WOLF_SHADOW = (180, 180, 200)
@@ -200,15 +200,26 @@ class Wolf:
         self.position = POS_LEFT_BOTTOM
         self.animation_timer = 0
         self.catch_animation = 0
+        self.blink_timer = 0
+        self.blinking = False
         
     def set_position(self, pos):
         self.position = pos
         
     def trigger_catch(self):
         self.catch_animation = 1.0
+        self.blinking = True
+        self.blink_timer = 0.3  # Время моргания
         
     def update(self, dt):
         self.animation_timer += dt
+        
+        # Анимация моргания
+        if self.blinking:
+            self.blink_timer -= dt
+            if self.blink_timer <= 0:
+                self.blinking = False
+        
         if self.catch_animation > 0:
             self.catch_animation -= dt * 3
             
@@ -217,41 +228,78 @@ class Wolf:
         
         # Анимация тела волка
         bounce = math.sin(self.animation_timer * 3) * 2
-        body_rect = pygame.Rect(0, 0, 64, 90)
-        body_rect.center = (cx, cy + bounce)
         
-        # Тень тела
-        pygame.draw.rect(surf, WOLF_SHADOW, body_rect.move(2, 2), border_radius=10)
-        # Основное тело
-        pygame.draw.rect(surf, WOLF_COLOR, body_rect, border_radius=10)
+        # Голова волка (основной круг)
+        head_radius = 40
+        head_center = (cx, cy - 10 + bounce)
+        
+        # Тень головы
+        pygame.draw.circle(surf, WOLF_SHADOW, 
+                          (head_center[0] + 3, head_center[1] + 3), 
+                          head_radius + 2)
+        
+        # Тело волка (овал)
+        body_rect = pygame.Rect(cx - 35, cy + 5 + bounce, 70, 50)
+        pygame.draw.ellipse(surf, WOLF_SHADOW, body_rect.move(2, 2))
+        pygame.draw.ellipse(surf, WOLF_COLOR, body_rect)
+        
+        # Голова
+        pygame.draw.circle(surf, WOLF_COLOR, head_center, head_radius)
         
         # Уши
-        ear_left = (cx - 20, cy - 35 + bounce)
-        ear_right = (cx + 20, cy - 35 + bounce)
-        pygame.draw.circle(surf, WOLF_SHADOW, ear_left, 10)
-        pygame.draw.circle(surf, WOLF_SHADOW, ear_right, 10)
-        pygame.draw.circle(surf, WOLF_COLOR, (cx - 20, cy - 35 + bounce), 8)
-        pygame.draw.circle(surf, WOLF_COLOR, (cx + 20, cy - 35 + bounce), 8)
+        ear_left = (cx - 25, cy - 40 + bounce)
+        ear_right = (cx + 25, cy - 40 + bounce)
+        
+        # Тень ушей
+        pygame.draw.circle(surf, WOLF_SHADOW, (ear_left[0] + 2, ear_left[1] + 2), 12)
+        pygame.draw.circle(surf, WOLF_SHADOW, (ear_right[0] + 2, ear_right[1] + 2), 12)
+        
+        # Уши
+        pygame.draw.circle(surf, WOLF_COLOR, ear_left, 10)
+        pygame.draw.circle(surf, WOLF_COLOR, ear_right, 10)
+        pygame.draw.circle(surf, (200, 180, 200), (cx - 25, cy - 40 + bounce), 6)
+        pygame.draw.circle(surf, (200, 180, 200), (cx + 25, cy - 40 + bounce), 6)
         
         # Морда
-        pygame.draw.circle(surf, WOLF_COLOR, (cx, cy - 5 + bounce), 35)
-        
-        # Глаза
-        eye_y = cy - 15 + bounce
-        pygame.draw.circle(surf, (50, 50, 70), (cx - 12, eye_y), 6)
-        pygame.draw.circle(surf, (50, 50, 70), (cx + 12, eye_y), 6)
-        
-        # Зрачки с анимацией
-        pupil_dx = math.sin(self.animation_timer * 2) * 2
-        pygame.draw.circle(surf, (220, 220, 240), (cx - 12 + pupil_dx, eye_y), 3)
-        pygame.draw.circle(surf, (220, 220, 240), (cx + 12 + pupil_dx, eye_y), 3)
+        muzzle_rect = pygame.Rect(cx - 20, cy - 5 + bounce, 40, 25)
+        pygame.draw.ellipse(surf, (240, 240, 250), muzzle_rect)
         
         # Нос
-        pygame.draw.circle(surf, (80, 80, 100), (cx, cy + 5 + bounce), 8)
+        nose_pos = (cx, cy + 5 + bounce)
+        pygame.draw.circle(surf, (80, 80, 100), nose_pos, 8)
+        pygame.draw.circle(surf, (60, 60, 80), (cx, cy + 3 + bounce), 3)
+        
+        # Глаза
+        eye_y = cy - 10 + bounce
+        eye_left = (cx - 15, eye_y)
+        eye_right = (cx + 15, eye_y)
+        
+        # Белки глаз
+        if not self.blinking:
+            pygame.draw.circle(surf, (240, 240, 250), eye_left, 8)
+            pygame.draw.circle(surf, (240, 240, 250), eye_right, 8)
+            
+            # Зрачки с анимацией
+            pupil_dx = math.sin(self.animation_timer * 2) * 2
+            pygame.draw.circle(surf, (50, 50, 70), (eye_left[0] + pupil_dx, eye_left[1]), 5)
+            pygame.draw.circle(surf, (50, 50, 70), (eye_right[0] + pupil_dx, eye_right[1]), 5)
+            
+            # Блики в глазах
+            pygame.draw.circle(surf, (255, 255, 255), (eye_left[0] + pupil_dx - 2, eye_left[1] - 2), 2)
+            pygame.draw.circle(surf, (255, 255, 255), (eye_right[0] + pupil_dx - 2, eye_right[1] - 2), 2)
+        else:
+            # Моргание - глаза закрыты
+            pygame.draw.line(surf, (80, 80, 100), (eye_left[0] - 8, eye_left[1]), (eye_left[0] + 8, eye_left[1]), 3)
+            pygame.draw.line(surf, (80, 80, 100), (eye_right[0] - 8, eye_right[1]), (eye_right[0] + 8, eye_right[1]), 3)
         
         # Улыбка
         smile_y = cy + 15 + bounce
-        pygame.draw.arc(surf, (80, 80, 100), (cx - 15, smile_y - 10, 30, 20), 0.2, 2.9, 2)
+        pygame.draw.arc(surf, (80, 80, 100), 
+                       (cx - 15, smile_y - 5, 30, 15), 0.2, 2.9, 2)
+        
+        # Щеки
+        pygame.draw.circle(surf, (230, 200, 220), (cx - 25, cy + 5 + bounce), 6)
+        pygame.draw.circle(surf, (230, 200, 220), (cx + 25, cy + 5 + bounce), 6)
         
         # Анимация ловли
         catch_scale = 1.0 + self.catch_animation * 0.3
@@ -282,6 +330,17 @@ class Wolf:
             # Ручка корзины
             if is_active:
                 pygame.draw.arc(surf, color, (p[0]-10, p[1]-12, 20, 10), 3.14, 6.28, 2)
+                
+        # Хвост (добавим милый хвостик)
+        tail_time = self.animation_timer * 4
+        tail_wag = math.sin(tail_time) * 5
+        tail_points = [
+            (cx + 40, cy + 20 + bounce),
+            (cx + 55 + tail_wag, cy + 10 + bounce),
+            (cx + 50 + tail_wag, cy + 30 + bounce)
+        ]
+        pygame.draw.polygon(surf, WOLF_COLOR, tail_points)
+        pygame.draw.polygon(surf, WOLF_SHADOW, [(p[0] + 2, p[1] + 2) for p in tail_points])
 
 # -------------------------
 # Класс кнопки
@@ -392,6 +451,10 @@ class Game:
                 'color': random.choice(CLOUD_COLORS)
             })
         
+        # Рекорды
+        self.high_scores = [0, 0, 0, 0, 0]  # Топ-5 рекордов
+        self.load_high_scores()
+        
         # Кнопки меню
         center_x = SCREEN_W // 2
         self.menu_buttons = [
@@ -403,6 +466,71 @@ class Game:
             Button(SCREEN_W - 100, 10, 90, 30, "МЕНЮ", self.show_main_menu),
             Button(SCREEN_W - 100, 50, 90, 30, "ПАУЗА", self.toggle_pause)
         ]
+
+    def load_high_scores(self):
+        try:
+            with open('high_scores.txt', 'r') as f:
+                scores = [int(line.strip()) for line in f.readlines() if line.strip().isdigit()]
+                self.high_scores = sorted(scores, reverse=True)[:5]
+        except (FileNotFoundError, ValueError):
+            self.high_scores = [100, 80, 60, 40, 20]  # Значения по умолчанию
+
+    def save_high_scores(self):
+        with open('high_scores.txt', 'w') as f:
+            for score in self.high_scores:
+                f.write(f"{score}\n")
+
+    def update_high_scores(self, new_score):
+        if new_score > self.high_scores[-1]:
+            self.high_scores.append(new_score)
+            self.high_scores = sorted(self.high_scores, reverse=True)[:5]
+            self.save_high_scores()
+
+    def draw_high_scores_table(self, surf):
+        # Фон таблицы
+        table_rect = pygame.Rect(SCREEN_W - 200, 20, 180, 200)
+        pygame.draw.rect(surf, (0, 0, 0, 180), table_rect, border_radius=8)
+        pygame.draw.rect(surf, UI_COLOR, table_rect, 2, border_radius=8)
+        
+        # Заголовок таблицы
+        title = self.font.render("РЕКОРДЫ", True, OK_COLOR)
+        surf.blit(title, (SCREEN_W - 200 + (180 - title.get_width()) // 2, 30))
+        
+        # Разделительная линия
+        pygame.draw.line(surf, UI_COLOR, 
+                        (SCREEN_W - 200 + 10, 55),
+                        (SCREEN_W - 20, 55), 1)
+        
+        # Список рекордов
+        for i, score in enumerate(self.high_scores):
+            y_pos = 70 + i * 25
+            
+            # Медальки для топ-3
+            if i == 0:
+                medal_color = (255, 215, 0)  # золото
+                medal = "🥇"
+            elif i == 1:
+                medal_color = (192, 192, 192)  # серебро
+                medal = "🥈"
+            elif i == 2:
+                medal_color = (205, 127, 50)  # бронза
+                medal = "🥉"
+            else:
+                medal_color = TEXT_COLOR
+                medal = f"{i+1}."
+            
+            # Номер места
+            medal_text = self.font_small.render(medal, True, medal_color)
+            surf.blit(medal_text, (SCREEN_W - 190, y_pos))
+            
+            # Очки
+            score_text = self.font_small.render(f"{score}", True, TEXT_COLOR)
+            surf.blit(score_text, (SCREEN_W - 60, y_pos))
+            
+            # Разделитель
+            pygame.draw.line(surf, (100, 100, 120, 100),
+                            (SCREEN_W - 190, y_pos + 15),
+                            (SCREEN_W - 70, y_pos + 15), 1)
 
     def start_game(self):
         self.show_menu = False
@@ -417,6 +545,10 @@ class Game:
             self.paused = not self.paused
 
     def reset(self):
+        # Сохраняем рекорд перед сбросом
+        if self.game_over and self.score > 0:
+            self.update_high_scores(self.score)
+            
         self.eggs.clear()
         self.particles.clear()
         self.score = 0
@@ -607,6 +739,9 @@ class Game:
         for button in self.menu_buttons:
             button.draw(surf, self.font)
             
+        # Таблица рекордов справа сверху
+        self.draw_high_scores_table(surf)
+        
         # Управление в подвале
         controls = [
             "Управление: Q/A/E/D или стрелки",
@@ -619,8 +754,8 @@ class Game:
             surf.blit(text_surf, (SCREEN_W//2 - text_surf.get_width()//2, 280 + i*25))
 
     def draw_game_ui(self, surf):
-        # Панель счета
-        score_bg = pygame.Rect(10, 10, 150, 60)
+        # Панель счета (увеличиваем высоту для рекорда)
+        score_bg = pygame.Rect(10, 10, 150, 80)  # Было 60, стало 80
         pygame.draw.rect(surf, (0, 0, 0, 150), score_bg, border_radius=5)
         pygame.draw.rect(surf, UI_COLOR, score_bg, 2, border_radius=5)
         
@@ -628,10 +763,17 @@ class Game:
         score_text = self.font.render(f"СЧЕТ: {self.score}", True, TEXT_COLOR)
         surf.blit(score_text, (20, 15))
         
-        # Промахи
+        # === ДОБАВИТЬ ЗДЕСЬ ===
+        # Рекорд
+        high_score = self.high_scores[0] if self.high_scores else 0
+        record_text = self.font_small.render(f"РЕКОРД: {high_score}", True, OK_COLOR)
+        surf.blit(record_text, (20, 45))
+        # ======================
+        
+        # Промахи (смещаем ниже)
         hearts = "❤️ " * (MISS_TO_GAMEOVER - self.misses) + "💔 " * self.misses
         miss_text = self.font.render(hearts, True, TEXT_COLOR)
-        surf.blit(miss_text, (20, 45))
+        surf.blit(miss_text, (20, 65))  
         
         # Комбо
         if self.combo > 1 and self.combo_timer > 0:
@@ -727,4 +869,3 @@ class Game:
 
 if __name__ == "__main__":
     Game().run()
-
