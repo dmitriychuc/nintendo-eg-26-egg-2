@@ -23,6 +23,10 @@ OK_COLOR = (100, 200, 120)
 UI_COLOR = (80, 120, 180)
 UI_HIGHLIGHT = (120, 160, 220)
 
+# Новые цвета для визуальных улучшений
+STAR_COLORS = [(200, 200, 255), (180, 180, 240), (160, 160, 220)]
+CLOUD_COLORS = [(60, 60, 80), (70, 70, 90), (80, 80, 100)]
+
 MISS_TO_GAMEOVER = 3
 SPAWN_BASE_MS = 1200
 SPAWN_MIN_MS = 380
@@ -35,11 +39,9 @@ POS_LEFT_TOP, POS_RIGHT_TOP, POS_LEFT_BOTTOM, POS_RIGHT_BOTTOM = 0, 1, 2, 3
 # Вспомогательные функции
 # -------------------------
 def lerp(a, b, t):
-    # Для работы с числами
     return a + (b - a) * t
 
 def lerp_color(color1, color2, t):
-    # Интерполяция между двумя цветами (кортежами RGB)
     return (
         int(color1[0] + (color2[0] - color1[0]) * t),
         int(color1[1] + (color2[1] - color1[1]) * t),
@@ -91,16 +93,19 @@ class Particle:
         self.x = x
         self.y = y
         self.color = color
-        self.size = size
+        self.size = random.randint(2, size)
         self.life = life
         self.max_life = life
         self.velocity = velocity or (random.uniform(-2, 2), random.uniform(-3, 0))
+        self.rotation = random.uniform(0, 360)
+        self.rotate_speed = random.uniform(-5, 5)
         
     def update(self, dt):
         self.x += self.velocity[0]
         self.y += self.velocity[1]
         self.velocity = (self.velocity[0] * 0.95, self.velocity[1] + 0.2)
         self.life -= dt
+        self.rotation += self.rotate_speed * dt
         return self.life > 0
         
     def draw(self, surf):
@@ -108,7 +113,21 @@ class Particle:
         size = int(self.size * (self.life / self.max_life))
         if size > 0:
             s = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
-            pygame.draw.circle(s, (*self.color, alpha), (size, size), size)
+            
+            # Разные формы частиц
+            if random.random() > 0.7:
+                # Звездообразная частица
+                points = []
+                for i in range(5):
+                    angle = self.rotation + i * 72
+                    rad = math.radians(angle)
+                    points.append((size + math.cos(rad) * size, 
+                                  size + math.sin(rad) * size))
+                pygame.draw.polygon(s, (*self.color, alpha), points)
+            else:
+                # Круглая частица
+                pygame.draw.circle(s, (*self.color, alpha), (size, size), size)
+                
             surf.blit(s, (int(self.x - size), int(self.y - size)))
 
 # -------------------------
@@ -124,10 +143,19 @@ class Egg:
         self.dead = False
         self.rotation = random.uniform(0, 360)
         self.rotate_speed = random.uniform(-2, 2)
+        self.trail = []  # След за яйцом
         
     def update(self, dt):
         if self.dead:
             return
+        
+        # Сохраняем позицию для следа
+        if len(self.trail) < 5:
+            self.trail.append(self.pos())
+        else:
+            self.trail.pop(0)
+            self.trail.append(self.pos())
+            
         self.t += self.speed * dt
         self.rotation += self.rotate_speed
         if self.t >= 1.0:
@@ -138,6 +166,22 @@ class Egg:
     
     def draw(self, surf):
         x, y = self.pos()
+        
+        # Рисуем след
+        for i, pos in enumerate(self.trail):
+            alpha = i * 50  # Прозрачность уменьшается для более старых позиций
+            size = 5 - i  # Размер уменьшается
+            if size > 0:
+                s = pygame.Surface((size*2, size*2), pygame.SRCALPHA)
+                pygame.draw.circle(s, (*EGG_COLOR, alpha), (size, size), size)
+                surf.blit(s, (int(pos[0] - size), int(pos[1] - size)))
+        
+        # Свечение яйца
+        glow_size = 12
+        s = pygame.Surface((glow_size*2, glow_size*2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (*EGG_SHINE, 100), (glow_size, glow_size), glow_size)
+        surf.blit(s, (int(x - glow_size), int(y - glow_size)))
+        
         # Блеск на яйце
         angle_rad = math.radians(self.rotation)
         shine_x = x + math.cos(angle_rad) * 4
@@ -181,10 +225,33 @@ class Wolf:
         # Основное тело
         pygame.draw.rect(surf, WOLF_COLOR, body_rect, border_radius=10)
         
+        # Уши
+        ear_left = (cx - 20, cy - 35 + bounce)
+        ear_right = (cx + 20, cy - 35 + bounce)
+        pygame.draw.circle(surf, WOLF_SHADOW, ear_left, 10)
+        pygame.draw.circle(surf, WOLF_SHADOW, ear_right, 10)
+        pygame.draw.circle(surf, WOLF_COLOR, (cx - 20, cy - 35 + bounce), 8)
+        pygame.draw.circle(surf, WOLF_COLOR, (cx + 20, cy - 35 + bounce), 8)
+        
+        # Морда
+        pygame.draw.circle(surf, WOLF_COLOR, (cx, cy - 5 + bounce), 35)
+        
         # Глаза
         eye_y = cy - 15 + bounce
-        pygame.draw.circle(surf, (50, 50, 70), (cx - 12, eye_y), 4)
-        pygame.draw.circle(surf, (50, 50, 70), (cx + 12, eye_y), 4)
+        pygame.draw.circle(surf, (50, 50, 70), (cx - 12, eye_y), 6)
+        pygame.draw.circle(surf, (50, 50, 70), (cx + 12, eye_y), 6)
+        
+        # Зрачки с анимацией
+        pupil_dx = math.sin(self.animation_timer * 2) * 2
+        pygame.draw.circle(surf, (220, 220, 240), (cx - 12 + pupil_dx, eye_y), 3)
+        pygame.draw.circle(surf, (220, 220, 240), (cx + 12 + pupil_dx, eye_y), 3)
+        
+        # Нос
+        pygame.draw.circle(surf, (80, 80, 100), (cx, cy + 5 + bounce), 8)
+        
+        # Улыбка
+        smile_y = cy + 15 + bounce
+        pygame.draw.arc(surf, (80, 80, 100), (cx - 15, smile_y - 10, 30, 20), 0.2, 2.9, 2)
         
         # Анимация ловли
         catch_scale = 1.0 + self.catch_animation * 0.3
@@ -226,9 +293,23 @@ class Button:
         self.action = action
         self.hovered = False
         self.clicked = False
+        self.animation = 0  # 0-1 значение для анимации
         
     def update(self, mouse_pos, mouse_click):
+        was_hovered = self.hovered
         self.hovered = self.rect.collidepoint(mouse_pos)
+        
+        # Анимация при наведении
+        if self.hovered and not was_hovered:
+            self.animation = 0  # Начинаем анимацию
+        elif not self.hovered and was_hovered:
+            self.animation = 1  # Начинаем обратную анимацию
+            
+        if self.animation < 1 and self.hovered:
+            self.animation += 0.1
+        elif self.animation > 0 and not self.hovered:
+            self.animation -= 0.1
+            
         if self.hovered and mouse_click:
             if self.action:
                 self.action()
@@ -237,12 +318,23 @@ class Button:
         return False
         
     def draw(self, surf, font):
-        color = UI_HIGHLIGHT if self.hovered else UI_COLOR
-        pygame.draw.rect(surf, color, self.rect, border_radius=8)
-        pygame.draw.rect(surf, TEXT_COLOR, self.rect, 2, border_radius=8)
+        # Интерполяция цвета и размера на основе анимации
+        color = lerp_color(UI_COLOR, UI_HIGHLIGHT, self.animation)
+        scale = 1.0 + self.animation * 0.05
+        
+        # Масштабированный прямоугольник
+        scaled_rect = pygame.Rect(
+            self.rect.centerx - self.rect.width * scale / 2,
+            self.rect.centery - self.rect.height * scale / 2,
+            self.rect.width * scale,
+            self.rect.height * scale
+        )
+        
+        pygame.draw.rect(surf, color, scaled_rect, border_radius=8)
+        pygame.draw.rect(surf, TEXT_COLOR, scaled_rect, 2, border_radius=8)
         
         text_surf = font.render(self.text, True, TEXT_COLOR)
-        text_rect = text_surf.get_rect(center=self.rect.center)
+        text_rect = text_surf.get_rect(center=scaled_rect.center)
         surf.blit(text_surf, text_rect)
 
 # -------------------------
@@ -277,6 +369,28 @@ class Game:
         self.difficulty_meter = 0.0
         self.combo = 0
         self.combo_timer = 0
+        
+        # Анимированный фон
+        self.stars = []
+        for _ in range(50):
+            self.stars.append({
+                'x': random.randint(0, SCREEN_W),
+                'y': random.randint(0, SCREEN_H),
+                'size': random.randint(1, 3),
+                'speed': random.uniform(0.1, 0.3),
+                'color': random.choice(STAR_COLORS)
+            })
+            
+        self.clouds = []
+        for _ in range(5):
+            self.clouds.append({
+                'x': random.randint(0, SCREEN_W),
+                'y': random.randint(0, SCREEN_H//2),
+                'width': random.randint(60, 120),
+                'height': random.randint(20, 40),
+                'speed': random.uniform(0.05, 0.15),
+                'color': random.choice(CLOUD_COLORS)
+            })
         
         # Кнопки меню
         center_x = SCREEN_W // 2
@@ -361,6 +475,43 @@ class Game:
                 self.game_over = True
                 self.add_particles(SCREEN_W//2, SCREEN_H//2, 30, DANGER_COLOR)
 
+    def update_background(self, dt):
+        # Обновление звезд
+        for star in self.stars:
+            star['x'] -= star['speed'] * dt * 10
+            if star['x'] < 0:
+                star['x'] = SCREEN_W
+                star['y'] = random.randint(0, SCREEN_H)
+        
+        # Обновление облаков
+        for cloud in self.clouds:
+            cloud['x'] -= cloud['speed'] * dt * 10
+            if cloud['x'] < -cloud['width']:
+                cloud['x'] = SCREEN_W
+                cloud['y'] = random.randint(0, SCREEN_H//2)
+
+    def draw_background(self, surf):
+        # Рисуем звезды
+        for star in self.stars:
+            pygame.draw.circle(surf, star['color'], (int(star['x']), int(star['y'])), star['size'])
+        
+        # Рисуем облака
+        for cloud in self.clouds:
+            pygame.draw.ellipse(surf, cloud['color'], 
+                               (cloud['x'], cloud['y'], cloud['width'], cloud['height']))
+
+    def draw_vignette(self, surf):
+        # Создаем поверхность для виньетки
+        vignette = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+        
+        # Рисуем радиальный градиент
+        for r in range(150, 0, -1):
+            alpha = int(150 * (1 - r/150))
+            pygame.draw.circle(vignette, (0, 0, 0, alpha), 
+                              (SCREEN_W//2, SCREEN_H//2), r, 1)
+        
+        surf.blit(vignette, (0, 0))
+
     def process_input(self):
         mouse_pos = pygame.mouse.get_pos()
         mouse_click = pygame.mouse.get_pressed()[0]
@@ -398,6 +549,7 @@ class Game:
         if self.paused or self.game_over:
             return
 
+        self.update_background(dt)
         self.wolf.update(dt)
         
         # Обновление комбо
@@ -483,7 +635,6 @@ class Game:
         
         # Комбо
         if self.combo > 1 and self.combo_timer > 0:
-            # Исправленная строка - используем lerp_color вместо lerp
             combo_color = lerp_color(OK_COLOR, (255, 200, 0), min(1.0, self.combo/10.0))
             combo_text = self.font_big.render(f"COMBO x{self.combo}!", True, combo_color)
             surf.blit(combo_text, (SCREEN_W//2 - combo_text.get_width()//2, 80))
@@ -525,6 +676,9 @@ class Game:
         # Фон с узором
         self.screen.fill(BACKGROUND_COLOR)
         
+        # Анимированный фон
+        self.draw_background(self.screen)
+        
         # Сетчатый фон
         for x in range(0, SCREEN_W, 20):
             pygame.draw.line(self.screen, (40, 40, 50), (x, 0), (x, SCREEN_H), 1)
@@ -540,6 +694,9 @@ class Game:
             
         self.draw_particles(self.screen)
         self.draw_ui(self.screen)
+        
+        # Виньетка (затемнение по краям)
+        self.draw_vignette(self.screen)
         
         pygame.display.flip()
 
