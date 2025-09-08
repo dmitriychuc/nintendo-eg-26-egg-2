@@ -6,7 +6,7 @@ import pygame
 # -------------------------
 # Константы
 # -------------------------
-SCREEN_W, SCREEN_H = 520, 360
+SCREEN_W, SCREEN_H = 720, 600
 FPS_BASE = 60
 
 # Цвета
@@ -727,3 +727,4 @@ class Game:
 
 if __name__ == "__main__":
     Game().run()
+
